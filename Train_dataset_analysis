@@ -1,0 +1,155 @@
+library(tidyverse)
+library(raster)
+library(png)
+library(reshape2)
+library(ggplot2)
+library(dendextend)
+train<-read.csv("train.csv", header = T)
+pca<-prcomp(train[,-1])
+
+pca_plot <- data.frame(pca_x = pca$x[, 1], pca_y = pca$x[, 2], 
+                       label = as.factor(train$label))
+
+# Plot the first two principal components using the true labels as color and shape
+ggplot(pca_plot, aes(x = pca_x, y = pca_y, color = label)) + 
+	labs(title="PCA of all digits", y = "pca_2", x = "PC1") + 
+	geom_text(aes(label = label))
+  
+  #pca_2 vs PC3
+pca_plot2 <- data.frame(pca_x = pca$x[, 2], pca_y = pca$x[, 3], 
+                       label = as.factor(train$label))
+
+# Plot the first two principal components using the true labels as color and shape
+ggplot(pca_plot2, aes(x = pca_x, y = pca_y, color = label)) + 
+	labs(title="PCA of all digits", y = "PC3", x = "pca_2") + 
+	geom_text(aes(label = label))
+  
+  overview<-as.data.frame(summary(pca)$importance)
+overview<-as.data.frame(t(overview))
+overview$PC<-c(1:784)
+
+ggplot(data=overview[1:30, ], aes(x=PC, y=`Proportion of Variance`)) +
+  geom_bar(stat="identity")+
+  theme(axis.text.x = element_text(angle = 90))
+
+sum(overview$`Proportion of Variance`[1:10])
+
+
+ggplot(data=overview[1:30, ], aes(x=PC, y=`Cumulative Proportion`)) +
+  geom_bar(stat="identity")+
+  theme(axis.text.x = element_text(angle = 90))
+overview$`Cumulative Proportion`[10]
+
+
+#an example showing only the first 10 rows
+pca$x[1:10,1:10]
+
+#cluster pixels by eucledian distance, color by label:
+
+#I sampled a random portion of the dataset to cluster, as the entire dataset was taking up my computer's entire ram and crashing R
+set.seed(100)
+train_sample_1000<-sample_n(train, 1000)
+train_sample_1000$label<-as.factor(train_sample_1000$label)
+
+
+barplot(table(train_sample_1000$label))
+
+#save(train_Eucledian) #saves any object 
+train_Eucledian<-dist(train_sample_1000[,-1])
+hclust_eucled <- as.dendrogram(hclust(train_Eucledian, method = "complete"))
+
+hclust_eucled <- hclust(train_Eucledian, method = "complete")
+dend_eucled<-as.dendrogram(hclust_eucled)
+labels(dend_eucled)<-train_sample_1000$label
+labels_colors(dend_eucled) <- as.numeric(train_sample_1000$label)
+
+plot(dend_eucled, main = "Eucledian distance", horiz= F)
+
+
+set.seed(53)
+train_sample_50<-sample_n(train, 50)
+train_sample_50$label<-as.factor(train_sample_50$label)
+
+
+barplot(table(train_sample_50$label))
+
+#save(train_Eucledian) #saves any object 
+train_Eucledian<-dist(train_sample_50[,-1])
+hclust_eucled <- as.dendrogram(hclust(train_Eucledian, method = "complete"))
+
+hclust_eucled <- hclust(train_Eucledian, method = "complete")
+dend_eucled<-as.dendrogram(hclust_eucled)
+labels(dend_eucled)<-train_sample_50$label
+labels_colors(dend_eucled) <- as.numeric(train_sample_50$label)
+
+plot(dend_eucled, main = "Eucledian distance", horiz= F)
+
+
+train_Eucledian<-dist(t(train_sample_1000)[-1,])
+hclust_eucled <- as.dendrogram(hclust(train_Eucledian, method = "complete"))
+
+hclust_eucled <- hclust(train_Eucledian, method = "complete")
+dend_eucled<-as.dendrogram(hclust_eucled)
+labels(dend_eucled)<-c(1:785)
+
+
+plot(dend_eucled, main = "Eucledian distance", horiz= F)
+
+
+
+#remove pixels with 0 variance:
+pixel_variance<-train[,-1]%>%
+  summarise_if(is.numeric, var)
+pixels0var<-which(pixel_variance[1,] == min(pixel_variance))+1
+
+train0var_removed<-train[,-pixels0var]
+#0.75*42000
+#the training dataset shoud have 31500 rows and the test dataset will have the remaining 10500 + 10 my handwritten digits
+
+
+
+index_training_set<-sample(1:42000, 31500, replace = F)
+training_set<-train0var_removed[index_training_set, ]
+testing_set<-train0var_removed[-index_training_set, ]
+
+#load in my images: rows 105001:105010 are my handwriting
+digit_0_mine <- c(0,round(readPNG("numbers/0.png", native = F))[,,1])[-pixels0var]
+digit_1_mine <- c(1,round(readPNG("numbers/1.png", native = F))[,,1])[-pixels0var]
+digit_2_mine <- c(2,round(readPNG("numbers/2.png", native = F))[,,1])[-pixels0var]
+digit_3_mine <- c(3,round(readPNG("numbers/3.png", native = F))[,,1])[-pixels0var]
+digit_4_mine <- c(4,round(readPNG("numbers/4.png", native = F))[,,1])[-pixels0var]
+digit_5_mine <- c(5,round(readPNG("numbers/5.png", native = F))[,,1])[-pixels0var]
+digit_6_mine <- c(6,round(readPNG("numbers/6.png", native = F))[,,1])[-pixels0var]
+digit_7_mine <- c(7,round(readPNG("numbers/7.png", native = F))[,,1])[-pixels0var]
+digit_8_mine <- c(8,round(readPNG("numbers/8.png", native = F))[,,1])[-pixels0var]
+digit_9_mine <- c(9,round(readPNG("numbers/9.png", native = F))[,,1])[-pixels0var]
+
+testing_set<-rbind(testing_set, digit_0_mine, digit_1_mine, digit_2_mine, digit_3_mine, digit_4_mine, digit_5_mine, digit_6_mine, digit_7_mine, digit_8_mine, digit_9_mine)
+row.names(testing_set)<-c(1:10510) #resetting row id to numeric from 1 to max
+
+
+set.seed(123)
+classifier_lm<-lm(formula = label ~ ., data = training_set)
+
+#predict based on model
+prediction<-round(predict(classifier_lm, testing_set))
+
+result_labels<-data.frame(testing_set$label, prediction)%>%
+  rename(label =`testing_set.label`)
+
+
+x<-as.data.frame(table(result_labels))
+
+x%>%
+  ggplot(aes(label, prediction)) + 
+  geom_tile(aes(fill = Freq), colour = "white") + 
+  scale_fill_gradient(low = "white", high = "purple")+
+  theme(axis.text.x = element_text(angle = 90))
+
+for (i in c("0", "1", "2", "3", "4", "5", "6", "7","8","9")){
+  y<-x%>%
+    filter(label == i & prediction == i)%>%
+    pull(Freq)
+  print(paste0("digit ", i ," was predicted ", y, " times"))
+}
+
